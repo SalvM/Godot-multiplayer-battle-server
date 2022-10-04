@@ -1,6 +1,12 @@
 extends Node
 
-remote func fetch_player_damage():
+func create_new_match_room():
+	return {
+	"status": "waiting",
+	"players": {}
+}
+
+func fetch_player_damage():
 	return 10
 
 func _ready():
