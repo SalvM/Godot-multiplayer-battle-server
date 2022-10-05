@@ -1,9 +1,8 @@
 extends Node
 
-var randomizer = RandomNumberGenerator.new()
 var network = NetworkedMultiplayerENet.new()
 var port = 1909
-var max_players = 4
+var max_players = 2
 var puppets = {}
 var match_room = null
 
@@ -23,28 +22,38 @@ remote func fetch_user_join_room():
 		if match_room.players.size() <= max_players:
 			match_room.players[peer_id] = peer_id
 			rpc_id(peer_id, "return_room_status", match_room)
+			if match_room.players.size() == max_players:
+				load_battlefields()
 		else:
 			rpc_unreliable_id(peer_id, "return_message_from_server", "The room is full")
 	else:
 		rpc_unreliable_id(peer_id, "return_message_from_server", "The game is already started")
 
+remote func load_battlefields():
+	if not match_room.players.size() > 0:
+		return
+	for player_id in match_room.players:
+		user_load_battlefield(player_id)
+	match_room.status = "started"
+
 remote func user_load_battlefield(peer_id):
 	rpc_id(peer_id, "user_load_battlefield", peer_id)
 
-remote func user_spawn_puppet(peer_id, is_player_puppet):
-	randomizer.randomize()
-	var x_coordinates = randomizer.randi_range(100, 900)
-	rpc_id(peer_id, "user_spawn_puppet", peer_id, x_coordinates, is_player_puppet)
+remote func receive_player_state(player_state):
+	#printt("receive_player_state", player_state)
+	var player_id = get_tree().get_rpc_sender_id()
+	if puppets.has(player_id):
+		if puppets[player_id]["T"] < player_state["T"]:
+			puppets[player_id] = player_state
+	else:
+		puppets[player_id] = player_state
+
+remote func send_world_state(world_state):
+	rpc_unreliable_id(0, "receive_world_state", world_state)
 
 remote func register_player(peer_id):
 	var id = get_tree().get_rpc_sender_id()
-	puppets[peer_id] = null
-
-remote func fetch_battlefield_loaded():
-	var player_id = get_tree().get_rpc_sender_id()
-	if puppets[player_id] == null:
-		user_spawn_puppet(player_id, true)
-	print("User #" + str(player_id) + " has loaded the battlefield")
+	puppets[peer_id] = {"T": OS.get_system_time_msecs(), "P": Vector2(Fight.random_puppet_position(), 30)}
 
 remote func fetch_player_damage(requester_instance_id):
 	var player_id = get_tree().get_rpc_sender_id()
@@ -61,8 +70,13 @@ func _on_peer_connected(peer_id):
 	# rpc_id(peer_id, "user_load_battlefield", peer_id)
 	
 func _on_peer_disconnected(peer_id):
-	print("User #" + str(peer_id) + " disconnected")
+	var string_peer_id = str(peer_id)
+	print("User #" + string_peer_id + " disconnected")
+	if has_node(string_peer_id):
+		get_node(string_peer_id).queue_free()
 	if match_room.players.has(peer_id):
 		match_room.players.erase(peer_id)
 		rpc_id(0, "return_room_status", match_room)
-	puppets.erase(peer_id)
+	if puppets.has(peer_id):
+		puppets.erase(peer_id)
+		rpc_id(0, "despawn_player", peer_id)
