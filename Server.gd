@@ -15,6 +15,12 @@ func start_server():
 	network.connect("peer_connected", self, "_on_peer_connected")
 	network.connect("peer_disconnected", self, "_on_peer_disconnected")
 
+remote func fetch_server_time(client_time):
+	rpc_id(get_tree().get_rpc_sender_id(), "return_server_time", OS.get_system_time_msecs(), client_time)
+
+remote func determine_latency(client_time):
+	rpc_id(get_tree().get_rpc_sender_id(), "return_latency", client_time)
+
 remote func fetch_user_join_room():
 	var peer_id = get_tree().get_rpc_sender_id()
 	printt("fetch_user_join_room", peer_id)
@@ -42,23 +48,32 @@ remote func user_load_battlefield(peer_id):
 remote func receive_player_state(player_state):
 	#printt("receive_player_state", player_state)
 	var player_id = get_tree().get_rpc_sender_id()
+	var tmp_bars = [100, 80, 3]
 	if puppets.has(player_id):
 		if puppets[player_id]["T"] < player_state["T"]:
+			tmp_bars = puppets[player_id]["B"]
 			puppets[player_id] = player_state
 	else:
 		puppets[player_id] = player_state
+	puppets[player_id]["B"] = tmp_bars
 
 remote func send_world_state(world_state):
 	rpc_unreliable_id(0, "receive_world_state", world_state)
 
 remote func register_player(peer_id):
-	var id = get_tree().get_rpc_sender_id()
-	puppets[peer_id] = {"T": OS.get_system_time_msecs(), "P": Vector2(Fight.random_puppet_position(), 30)}
+	puppets[peer_id] = {
+		"T": OS.get_system_time_msecs(),	# time in ms
+		"P": Vector2(Fight.random_puppet_position(), 30),	# position
+		"S": 0, # State
+		"L": false, # Is looking left
+		"B": [100, 80, 3]
+	}
 
-remote func fetch_player_damage(requester_instance_id):
+remote func fetch_player_damage():
 	var player_id = get_tree().get_rpc_sender_id()
 	var damage = Fight.fetch_player_damage()
-	rpc_id(player_id, "return_player_damage", damage, requester_instance_id)
+	puppets[player_id]["B"][0] -= damage
+	puppets[player_id]["S"] = 4 # HURT
 	print("Sending " + str(damage) + " to player #" + str(player_id))
 	
 func _ready():
