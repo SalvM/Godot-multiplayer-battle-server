@@ -51,15 +51,25 @@ remote func receive_player_state(player_state):
 	var tmp_bars = [100, 80, 3]
 	if puppets.has(player_id):
 		if puppets[player_id]["T"] < player_state["T"]:
+			var tmp_anti_cheat = puppets[player_id]["anti_cheat"].duplicate(true) # the client doesn't have this
 			tmp_bars = puppets[player_id]["B"]
 			if puppets[player_id].S != player_state.S: # triggered once
-				if player_state.S in [5, 6]: # attacked
+				var is_attacking = player_state.S in [5, 6]
+				var is_dashing = player_state.S == 7
+				if is_attacking:
+					if not AntiCheat.can_attack(puppets[player_id], player_state): # the player is cheating!!
+						AntiCheat.on_player_cheating(player_id, puppets[player_id], player_state)
+					tmp_anti_cheat["last_attack_ms"] = player_state["T"]
 					tmp_bars[1] -= Fight.basic_attack_cost() # deduct stamina
-				elif player_state.S == 7: # dashed
+				if is_dashing:
+					if not AntiCheat.can_dash(puppets[player_id], player_state): # the player is cheating!!
+						AntiCheat.on_player_cheating(player_id, puppets[player_id], player_state)
+					tmp_anti_cheat["last_dash_ms"] = player_state["T"]
 					tmp_bars[2] -= 1 # consume dash stack
 			puppets[player_id] = player_state
+			puppets[player_id]["anti_cheat"] = tmp_anti_cheat
 	else:
-		puppets[player_id] = player_state
+		register_player(player_id)
 	puppets[player_id]["B"] = tmp_bars
 
 remote func send_world_state(world_state):
@@ -71,7 +81,11 @@ remote func register_player(peer_id):
 		"P": Vector2(Fight.random_puppet_position(), 30),	# position
 		"S": 0, # State
 		"L": false, # Is looking left
-		"B": [100, 80, 3]
+		"B": [100, 80, 3],
+		"anti_cheat": {
+			"last_attack_ms": 0,
+			"last_dash_ms": 0
+		} # used to check if the player is cheating, it won't be send to the players
 	}
 
 remote func fetch_player_damage():

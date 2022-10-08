@@ -17,6 +17,7 @@ config/icon="res://icon.png"
 [autoload]
 
 Fight="*res://Fight.gd"
+AntiCheat="*res://AntiCheat.gd"
 
 [gui]
 
