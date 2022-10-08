@@ -13,6 +13,12 @@ func fetch_player_damage():
 	
 func basic_attack_cost():
 	return 20
+
+func quick_attack_cooldown():
+	return 0.4 * 1000
+	
+func charged_attack_cooldown():
+	return 0.6 * 1000
 	
 func random_puppet_position():
 	randomizer.randomize()

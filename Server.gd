@@ -52,6 +52,11 @@ remote func receive_player_state(player_state):
 	if puppets.has(player_id):
 		if puppets[player_id]["T"] < player_state["T"]:
 			tmp_bars = puppets[player_id]["B"]
+			if puppets[player_id].S != player_state.S: # triggered once
+				if player_state.S in [5, 6]: # attacked
+					tmp_bars[1] -= Fight.basic_attack_cost() # deduct stamina
+				elif player_state.S == 7: # dashed
+					tmp_bars[2] -= 1 # consume dash stack
 			puppets[player_id] = player_state
 	else:
 		puppets[player_id] = player_state
@@ -73,7 +78,6 @@ remote func fetch_player_damage():
 	var player_id = get_tree().get_rpc_sender_id()
 	var damage = Fight.fetch_player_damage()
 	puppets[player_id]["B"][0] -= damage
-	puppets[player_id]["S"] = 4 # HURT
 	print("Sending " + str(damage) + " to player #" + str(player_id))
 	
 func _ready():
