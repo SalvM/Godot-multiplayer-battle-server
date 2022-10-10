@@ -10,6 +10,7 @@ The player can attack if:
 """
 func can_attack(prev_player_state, future_player_state) -> bool:
 	if prev_player_state["B"][1] < Fight.basic_attack_cost():
+		printt("Player cannot attack because of stamina", prev_player_state["B"][1])
 		return false
 	var waited_time = future_player_state["T"] - prev_player_state["anti_cheat"]["last_attack_ms"]
 	var time_to_wait = 0
@@ -21,6 +22,7 @@ func can_attack(prev_player_state, future_player_state) -> bool:
 		_:
 			time_to_wait = Fight.quick_attack_cooldown()
 	if waited_time < time_to_wait:
+		printt("Player cannot attack because of time", waited_time)
 		return false
 	return true
 
