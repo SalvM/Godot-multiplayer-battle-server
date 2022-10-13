@@ -10,7 +10,7 @@ func create_new_match_room():
 }
 
 func fetch_player_damage():
-	return 15
+	return 25
 	
 func basic_attack_cost():
 	return 20

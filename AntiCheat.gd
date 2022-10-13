@@ -42,6 +42,9 @@ func can_dash(prev_player_state, future_player_state) -> bool:
 		return false
 	return true
 
+func is_dead(future_player_state) -> bool:
+	return future_player_state["B"][0] <= 0
+
 func on_player_cheating(player_id, prev_state, future_state) -> void:
 	print("The player #" + str(player_id) + " is cheating! Call the internet police!")
 	future_state["S"] = prev_state["S"] # prevent the cheater to change the status

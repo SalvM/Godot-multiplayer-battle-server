@@ -129,7 +129,12 @@ remote func receive_player_state(player_state, room_id):
 	if prev_state["T"] < player_state["T"]:
 		var tmp_anti_cheat = prev_state["anti_cheat"].duplicate(true) # the client doesn't have this
 		tmp_bars = prev_state["B"]
-		if prev_state.S != player_state.S: # triggered once
+		var is_dead = AntiCheat.is_dead(prev_state)
+		if is_dead:
+			player_state["S"] = 8
+			player_state["P"] = prev_state["P"]
+			tmp_bars = [0,0,0]
+		if prev_state.S != player_state.S && !is_dead: # triggered once
 			var is_attacking = player_state.S in [5, 6]
 			var is_dashing = player_state.S == 7
 			if is_attacking:
@@ -158,6 +163,7 @@ remote func receive_player_state(player_state, room_id):
 			MatchRooms.get_child(int(room_id)).puppets[player_id]["anti_cheat"] = tmp_anti_cheat
 			MatchRooms.get_child(int(room_id)).puppets[player_id]["B"] = tmp_bars
 			"""
+		print(tmp_bars)
 
 func get_match_rooms_status():
 	var match_rooms = []
@@ -186,6 +192,9 @@ remote func fetch_player_damage(room_id):
 	var damage = Fight.fetch_player_damage()
 	var player_puppet = get_puppet(player_id, room_id)
 	if !player_puppet:
+		return
+	if AntiCheat.is_dead(player_puppet):
+		player_puppet["S"] = 8
 		return
 	player_puppet["B"][0] -= damage
 	print("[Room " + str(room_id) + "] Sending " + str(damage) + " to player #" + str(player_id))
