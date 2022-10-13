@@ -1,12 +1,14 @@
 extends Node
 
+const PORT = 4242
+const RECONNECT_TIMEOUT: float = 3.0
+
 onready var MatchRoom = preload("res://Room.tscn")
 
 onready var Logger = $Logger
 onready var MatchRooms = $Rooms
 
 var network = NetworkedMultiplayerENet.new()
-const port = 4050
 
 const FPS = 0.5
 const frames_to_skip = 60 / FPS
@@ -44,14 +46,27 @@ func get_puppet(player_id, room_id):
 		return false
 
 func start_server():
-	_print("Starting the server on port: " + str(port))
-	network.create_server(port, max_players_per_room)
+	_print("Starting the server on port: " + str(PORT))
+	network.create_server(PORT, max_players_per_room)
 	get_tree().set_network_peer(network)
-	_print("Server started at port: " + str(port))
+	_print("Server started at port: " + str(PORT))
 	create_match_rooms()
 
 	network.connect("peer_connected", self, "_on_peer_connected")
 	network.connect("peer_disconnected", self, "_on_peer_disconnected")
+
+func start_server_with_websocket():
+	var server = WebSocketServer.new()
+	var err = server.listen(PORT, PoolStringArray(), true)
+	if err != OK:
+		_print("Unable to start server")
+		set_process(false)
+		return
+	_print("Server started at port: " + str(PORT))
+	get_tree().set_network_peer(server)
+	create_match_rooms()
+	server.connect("peer_connected", self, "_on_peer_connected")
+	server.connect("peer_disconnected", self, "_on_peer_disconnected")
 
 func default_puppet():
 	return {
@@ -120,17 +135,34 @@ remote func receive_player_state(player_state, room_id):
 					AntiCheat.on_player_cheating(player_id, prev_state, player_state)
 				tmp_anti_cheat["last_dash_ms"] = player_state["T"]
 				tmp_bars[2] -= 1 # consume dash stack
-		MatchRooms.get_child(int(room_id)).puppets[player_id] = player_state
-		MatchRooms.get_child(int(room_id)).puppets[player_id]["anti_cheat"] = tmp_anti_cheat
-		MatchRooms.get_child(int(room_id)).puppets[player_id]["B"] = tmp_bars
+		var current_puppet = get_puppet(player_id, room_id)
+		print(current_puppet)
+		if current_puppet:
+			current_puppet["L"] = player_state["L"]
+			current_puppet["P"] = player_state["P"]
+			current_puppet["S"] = player_state["S"]
+			current_puppet["T"] = player_state["T"]
+			current_puppet["anti_cheat"] = tmp_anti_cheat
+			current_puppet["B"] = tmp_bars
+			"""
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["L"] = player_state["L"]
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["P"] = player_state["P"]
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["S"] = player_state["S"]
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["T"] = player_state["T"]
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["anti_cheat"] = tmp_anti_cheat
+			MatchRooms.get_child(int(room_id)).puppets[player_id]["B"] = tmp_bars
+			"""
 
 remote func send_match_rooms(): # only for waiting players in the lobby
 	var match_rooms = []
-	print("send_match_rooms")
+	var excluded_players = [] # they are playing so they don't need this rpc
 	for match_room in MatchRooms.get_children():
-		match_rooms.append(match_room.room_status())
+		var room_status = match_room.room_status()
+		match_rooms.append(room_status)
+		if room_status.status != "WAITING":
+			excluded_players.append_array(room_status.players)
 	for player_id in connected_players.keys():
-		if connected_players[player_id] == -1:
+		if not player_id in excluded_players:
 			rpc_unreliable_id(player_id, "return_match_rooms", match_rooms)
 
 remote func send_room_state(room_state, players_list):
@@ -147,7 +179,8 @@ remote func fetch_player_damage(room_id):
 	print("[Room " + str(room_id) + "] Sending " + str(damage) + " to player #" + str(player_id))
 	
 func _ready():
-	start_server()
+	#start_server()
+	start_server_with_websocket()
 
 func _physics_process(delta):
 	current_frame += 1
