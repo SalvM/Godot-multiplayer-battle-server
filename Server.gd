@@ -90,17 +90,24 @@ remote func determine_latency(client_time):
 remote func fetch_user_join_room(room_id):
 	var peer_id = get_tree().get_rpc_sender_id()
 	print("User #" + str(peer_id) + " is trying enter room #" + str(room_id))
-	var match_room = get_match_room(room_id)
-	if !match_room:
-		rpc_unreliable_id(peer_id, "return_message_from_server", "The room is closed")
-		return
-	if match_room.can_join_room() && !match_room.is_player_in_room(peer_id):
-		match_room.join_room(peer_id)
-		connected_players[peer_id] = room_id
-		rpc_id(peer_id, "return_match_room_status", get_match_room(room_id).room_status())
-		print("User #" + str(peer_id) + " joined room #" + str(room_id))
-	else:
-		rpc_unreliable_id(peer_id, "return_message_from_server", "The room is full")
+	for match_room in MatchRooms.get_children():
+		if !match_room:
+			rpc_unreliable_id(peer_id, "return_message_from_server", "The room is closed")
+			return
+		if int(match_room.name) == int(room_id):
+			if match_room.can_join_room() && !match_room.is_player_in_room(peer_id):
+				connected_players[peer_id] = room_id
+				match_room.join_room(peer_id)
+				print("User #" + str(peer_id) + " joined room #" + str(room_id))
+			else:
+				rpc_unreliable_id(peer_id, "return_message_from_server", "The room is full")
+		else:
+			#print("User #" + str(peer_id) + " leaved room #" + match_room.name)
+			match_room.leave_room(peer_id)
+	rpc_unreliable_id(peer_id, "return_match_rooms", get_match_rooms_status().match_rooms)
+
+remote func fetch_user_leave_room(room_id):
+	get_match_room(room_id).leave_room(get_tree().get_rpc_sender_id())
 
 remote func load_battlefields(room_id):
 	var match_room = get_match_room(room_id)
@@ -115,7 +122,7 @@ remote func user_load_battlefield(peer_id, room_id):
 
 remote func receive_player_state(player_state, room_id):
 	var player_id = get_tree().get_rpc_sender_id()
-	var tmp_bars = [100, 80, 3]
+	var tmp_bars = Fight.default_puppet_bar()
 	var prev_state = get_puppet(player_id, room_id)
 	if !prev_state:
 		return
@@ -136,7 +143,6 @@ remote func receive_player_state(player_state, room_id):
 				tmp_anti_cheat["last_dash_ms"] = player_state["T"]
 				tmp_bars[2] -= 1 # consume dash stack
 		var current_puppet = get_puppet(player_id, room_id)
-		print(current_puppet)
 		if current_puppet:
 			current_puppet["L"] = player_state["L"]
 			current_puppet["P"] = player_state["P"]
@@ -153,7 +159,7 @@ remote func receive_player_state(player_state, room_id):
 			MatchRooms.get_child(int(room_id)).puppets[player_id]["B"] = tmp_bars
 			"""
 
-remote func send_match_rooms(): # only for waiting players in the lobby
+func get_match_rooms_status():
 	var match_rooms = []
 	var excluded_players = [] # they are playing so they don't need this rpc
 	for match_room in MatchRooms.get_children():
@@ -161,6 +167,12 @@ remote func send_match_rooms(): # only for waiting players in the lobby
 		match_rooms.append(room_status)
 		if room_status.status != "WAITING":
 			excluded_players.append_array(room_status.players)
+	return { "excluded_players": excluded_players, "match_rooms": match_rooms }
+
+remote func send_match_rooms(): # only for waiting players in the lobby
+	var match_rooms_status = get_match_rooms_status()
+	var excluded_players = match_rooms_status.excluded_players
+	var match_rooms = match_rooms_status.match_rooms
 	for player_id in connected_players.keys():
 		if not player_id in excluded_players:
 			rpc_unreliable_id(player_id, "return_match_rooms", match_rooms)

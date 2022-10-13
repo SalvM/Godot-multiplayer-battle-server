@@ -11,7 +11,10 @@ onready var processing = $StateProcessing
 var max_players = 2
 var state = RoomState.WAITING
 
-const puppets = {}
+var puppets = {}
+
+func _add_puppet(player_id, puppet_data):
+	puppets[player_id] = default_puppet()
 
 func is_player_in_room(player_id) -> bool:
 	return puppets.has(player_id)
@@ -31,17 +34,18 @@ func default_puppet():
 		"P": Vector2(Fight.random_puppet_position(), 30),	# position
 		"S": 0, # State
 		"L": false, # Is looking left
-		"B": [100, 80, 3],
+		"B": Fight.default_puppet_bar(),
 		"anti_cheat": {
 			"last_attack_ms": 0,
 			"last_dash_ms": 0
-		} # used to check if the player is cheating, it won't be send to the players
+		}
+	# used to check if the player is cheating, it won't be send to the players
 	}
 
 func join_room(player_id):
 	if !can_join_room():
 		return
-	puppets[player_id] = default_puppet()
+	_add_puppet(player_id, default_puppet())
 	if is_room_full():
 		get_node("/root/Server").load_battlefields(self.name)
 		processing.synch = true # the room will start sending state

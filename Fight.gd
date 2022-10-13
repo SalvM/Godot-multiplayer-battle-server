@@ -2,6 +2,7 @@ extends Node
 
 var randomizer = RandomNumberGenerator.new()
 
+
 func create_new_match_room():
 	return {
 	"status": "waiting",
@@ -9,7 +10,7 @@ func create_new_match_room():
 }
 
 func fetch_player_damage():
-	return 10
+	return 15
 	
 func basic_attack_cost():
 	return 20
@@ -23,6 +24,9 @@ func charged_attack_cooldown():
 func random_puppet_position():
 	randomizer.randomize()
 	return randomizer.randi_range(100, 900)
+
+func default_puppet_bar():
+	return [100, 80, 3]
 
 func _ready():
 	pass 
